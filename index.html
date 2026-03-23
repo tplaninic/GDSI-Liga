@@ -301,7 +301,7 @@ function render(){
       const ss=d.scores.map(([a,b])=>a+':'+b).join(', ');let g1=0,g2=0;d.scores.forEach(([a,b])=>{a>b?g1++:g2++});
       lh+=`<div class="local-strip"><div><span class="info">${sn(m.team1[0])}/${sn(m.team1[1])} vs ${sn(m.team2[0])}/${sn(m.team2[1])}</span> <span class="detail">${ss} (${g1}:${g2})</span></div><button class="btn-remove" onclick="delete localResults['${currentLeague}'][${mid}];if(!Object.keys(localResults['${currentLeague}']).length)delete localResults['${currentLeague}'];saveLocal();recalc()">Ukloni</button></div>`;
     });
-    main.innerHTML+=`<div class="section"><div class="section-head">Lokalno uneseni rezultati <span class="note">nestaju kad osvjezis stranicu</span></div>${lh}</div>`;
+    main.innerHTML+=`<div class="section"><div class="section-head">Lokalno uneseni rezultati</div>${lh}</div>`;
   }
 
   // standings
