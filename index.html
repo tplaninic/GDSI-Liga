@@ -255,6 +255,21 @@ function getEff(ln){
   return{players:pl,matches:nm,remaining:nr};
 }
 
+function applyFilters(lg){
+  const hasFilters=Object.keys(matchFilters).length>0;
+  if(!hasFilters||!lg.remaining.length)return lg;
+  const outs=[{a:2,b:0},{a:2,b:1},{a:1,b:2},{a:0,b:2}];
+  const pl=lg.players.map(p=>({...p})),pm={};pl.forEach(p=>{pm[p.name]=p});
+  const nr=[];
+  lg.remaining.forEach((m,i)=>{
+    if(matchFilters[i]===undefined){nr.push(m);return}
+    const o=outs[matchFilters[i]],wt=o.a>o.b?m.team1:m.team2,lt=o.a>o.b?m.team2:m.team1;
+    const wg=Math.max(o.a,o.b),lg2=Math.min(o.a,o.b),pt=pts(wg,lg2);
+    wt.forEach(n=>{const p=pm[n];if(p){p.score+=pt.w;p.matches++;const[gw,gl]=pr(p.games);p.games=`${gw+wg}:${gl+lg2}`;const[ww,wl]=pr(p.wl);p.wl=`${ww+1}:${wl}`}});
+    lt.forEach(n=>{const p=pm[n];if(p){p.score+=pt.l;p.matches++;const[gw,gl]=pr(p.games);p.games=`${gw+lg2}:${gl+wg}`;const[ww,wl]=pr(p.wl);p.wl=`${ww}:${wl+1}`}});
+  });
+  return{players:pl,matches:lg.matches,remaining:nr};
+}
 function calcScenarios(ln){
   const lg=getEff(ln);if(!lg||!lg.remaining.length)return null;
   const outs=[{l:'2-0',a:2,b:0},{l:'2-1',a:2,b:1},{l:'1-2',a:1,b:2},{l:'0-2',a:0,b:2}];
@@ -296,7 +311,7 @@ function analyze(res,lg){
   if(!res)return null;const{scenarios:sc,approx}=res;if(!sc.length)return null;
   const n=lg.players.length,pc={},cb={};
   lg.players.forEach(p=>{pc[p.name]={};for(let i=1;i<=n;i++)pc[p.name][i]=0});
-  sc.forEach(s=>{s.rk.forEach((nm,i)=>{pc[nm][i+1]++});const k=s.rk.join('|');if(!cb[k])cb[k]={c:0,rk:s.rk,sc:s.sc};cb[k].c++});
+  sc.forEach(s=>{s.rk.forEach((nm,i)=>{pc[nm][i+1]++});const sk=s.rk.map(nm=>nm+'='+s.sc[nm]).join('|');if(!cb[sk])cb[sk]={c:0,rk:s.rk,sc:s.sc};cb[sk].c++});
   const tot=sc.length,rs=n<=5?4:5,gu={};
   lg.players.forEach(p=>{const pos=Object.entries(pc[p.name]).filter(([,c])=>c>0).map(([i])=>+i);
     let pro=(pc[p.name][1]||0)+(pc[p.name][2]||0),rel=0;for(let i=rs;i<=n;i++)rel+=(pc[p.name][i]||0);
@@ -323,11 +338,12 @@ function render(){
   });
 
   const main=document.getElementById('main');main.innerHTML='';
-  const lg=getEff(currentLeague);if(!lg)return;
+  const lgBase=getEff(currentLeague);if(!lgBase)return;
+  const lg=applyFilters(lgBase);
   const an=allAnalysis[currentLeague];
 
   // player picker
-  main.innerHTML+=`<div class="section"><div class="picker"><label>Oznaci sebe:</label><select onchange="selectedPlayer=this.value||null;render()"><option value="">--</option>${lg.players.map(p=>`<option value="${p.name}"${selectedPlayer===p.name?' selected':''}>${p.name}</option>`).join('')}</select></div></div>`;
+  main.innerHTML+=`<div class="section"><div class="picker"><label>Oznaci sebe:</label><select onchange="selectedPlayer=this.value||null;render()"><option value="">--</option>${lgBase.players.map(p=>`<option value="${p.name}"${selectedPlayer===p.name?' selected':''}>${p.name}</option>`).join('')}</select></div></div>`;
 
   // local results banner
   const loc=localResults[currentLeague]||{};
@@ -382,7 +398,7 @@ function render(){
     let sh=`<div class="stats">`;
     sh+=`<div class="stat"><div class="val">${an.tot.toLocaleString()}</div><div class="lbl">Scenarija${an.approx?' (uzorak)':''}</div></div>`;
     sh+=`<div class="stat"><div class="val">${an.combos.length}</div><div class="lbl">Razlicitih poredaka</div></div>`;
-    sh+=`<div class="stat"><div class="val">${lg.remaining.length}</div><div class="lbl">Preostalih susreta</div></div>`;
+    sh+=`<div class="stat"><div class="val">${lgBase.remaining.length}</div><div class="lbl">Preostalih susreta</div></div>`;
     if(selectedPlayer&&an.gu[selectedPlayer]){const g=an.gu[selectedPlayer];
       sh+=`<div class="stat"><div class="val" style="color:#5b5">${g.pc.toFixed(0)}%</div><div class="lbl">Sansa za promociju</div></div>`;
       sh+=`<div class="stat"><div class="val" style="color:${g.rc>0?'#b55':'#5b5'}">${g.rc.toFixed(0)}%</div><div class="lbl">Rizik ispadanja</div></div>`;
@@ -422,10 +438,10 @@ function render(){
     main.innerHTML+=`<div class="section"><div class="section-head">Vjerojatnosti pozicija</div><div class="section-body">${pb}${pmc}</div></div>`;
   }
 
-  // remaining matches
-  if(lg.remaining.length){
+  // remaining matches (use lgBase so locked filters still show)
+  if(lgBase.remaining.length){
     let rm='';
-    lg.remaining.forEach((m,i)=>{
+    lgBase.remaining.forEach((m,i)=>{
       const t1=m.team1.map(sn),t2=m.team2.map(sn);
       const t1j=t1.join(' / '),t2j=t2.join(' / ');
       rm+=`<div class="match-block">
@@ -446,7 +462,7 @@ function render(){
         </div>
       </div>`;
     });
-    main.innerHTML+=`<div class="section"><div class="section-head">Preostali susreti (${lg.remaining.length})</div>${rm}</div>`;
+    main.innerHTML+=`<div class="section"><div class="section-head">Preostali susreti (${lgBase.remaining.length})</div>${rm}</div>`;
   }
 
   // ranking combos
