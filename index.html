@@ -568,32 +568,46 @@ function render(){
     if(guar.length)sh+=`<div style="padding:0 16px 14px;font-size:.8rem;color:#888">Sigurno: ${guar.join(' / ')}</div>`;
     main.innerHTML+=`<div class="section">${sh}</div>`;
 
-    // probabilities
-    const colors=['#b9922a','#7a7a7a','#8a5a1a','#8a3333','#5a2222','#3a1a5a'];
-    const posLabels=['1.','2.','3.','4.','5.','6.','7.','8.'];
+    // probabilities - 3 zones: promote (top 2), stay (middle), relegate (rs+)
+    function zoneStats(name){
+      let promo=0,stay=0,rele=0;
+      for(let i=1;i<=n;i++){
+        const c=an.pc[name][i]||0;
+        if(i<=2)promo+=c;else if(i>=rs)rele+=c;else stay+=c;
+      }
+      return{promo:promo/an.tot*100,stay:stay/an.tot*100,rele:rele/an.tot*100};
+    }
     // desktop table
     let pb=`<div class="prob-table-desktop"><table><tr><th>Igrac</th>`;
-    for(let i=1;i<=n;i++)pb+=`<th style="text-align:center;width:50px">${i}.</th>`;
-    pb+='<th style="min-width:160px"></th></tr>';
-    sorted.forEach(p=>{const me=p.name===selectedPlayer;
+    pb+=`<th style="text-align:center">Napreduje</th><th style="text-align:center">Ostaje</th><th style="text-align:center">Ispada</th>`;
+    pb+='<th style="min-width:180px"></th></tr>';
+    sorted.forEach(p=>{const me=p.name===selectedPlayer;const z=zoneStats(p.name);
       pb+=`<tr${me?' class="me"':''}><td>${sn(p.name)}</td>`;
-      for(let i=1;i<=n;i++){const c=an.pc[p.name][i]||0,pct=(c/an.tot*100).toFixed(0);pb+=`<td style="text-align:center;color:${c?'#bbb':'#444'};font-weight:${c?'600':'400'}">${pct}%</td>`}
+      pb+=`<td style="text-align:center;color:${z.promo>0?'#5b5':'#444'};font-weight:${z.promo>0?'600':'400'}">${z.promo.toFixed(0)}%</td>`;
+      pb+=`<td style="text-align:center;color:${z.stay>0?'#ba5':'#444'};font-weight:${z.stay>0?'600':'400'}">${z.stay.toFixed(0)}%</td>`;
+      pb+=`<td style="text-align:center;color:${z.rele>0?'#b55':'#444'};font-weight:${z.rele>0?'600':'400'}">${z.rele.toFixed(0)}%</td>`;
       pb+=`<td><div class="pbar">`;
-      for(let i=1;i<=n;i++){const c=an.pc[p.name][i]||0,pct=c/an.tot*100;if(pct>0)pb+=`<span style="width:${pct}%;background:${colors[i-1]}">${pct>=8?pct.toFixed(0)+'%':''}</span>`}
+      if(z.promo>0)pb+=`<span style="width:${z.promo}%;background:#3a6a3a">${z.promo>=8?z.promo.toFixed(0)+'%':''}</span>`;
+      if(z.stay>0)pb+=`<span style="width:${z.stay}%;background:#6a5a2a">${z.stay>=8?z.stay.toFixed(0)+'%':''}</span>`;
+      if(z.rele>0)pb+=`<span style="width:${z.rele}%;background:#6a2a2a">${z.rele>=8?z.rele.toFixed(0)+'%':''}</span>`;
       pb+=`</div></td></tr>`;
     });
     pb+='</table></div>';
     // mobile cards
     let pmc='<div class="prob-cards" style="display:none">';
-    sorted.forEach(p=>{const me=p.name===selectedPlayer;
+    sorted.forEach(p=>{const me=p.name===selectedPlayer;const z=zoneStats(p.name);
       pmc+=`<div class="prob-card${me?' me':''}"><div class="prob-card-name">${p.name}</div><div class="prob-card-bar">`;
-      for(let i=1;i<=n;i++){const c=an.pc[p.name][i]||0,pct=c/an.tot*100;if(pct>0)pmc+=`<span style="width:${pct}%;background:${colors[i-1]}">${pct>=6?pct.toFixed(0)+'%':''}</span>`}
+      if(z.promo>0)pmc+=`<span style="width:${z.promo}%;background:#3a6a3a">${z.promo>=6?z.promo.toFixed(0)+'%':''}</span>`;
+      if(z.stay>0)pmc+=`<span style="width:${z.stay}%;background:#6a5a2a">${z.stay>=6?z.stay.toFixed(0)+'%':''}</span>`;
+      if(z.rele>0)pmc+=`<span style="width:${z.rele}%;background:#6a2a2a">${z.rele>=6?z.rele.toFixed(0)+'%':''}</span>`;
       pmc+=`</div><div class="prob-card-positions">`;
-      for(let i=1;i<=n;i++){const c=an.pc[p.name][i]||0,pct=(c/an.tot*100).toFixed(0);if(+pct>0)pmc+=`<span class="prob-pos">${posLabels[i-1]} <b>${pct}%</b></span>`}
+      if(z.promo>0)pmc+=`<span class="prob-pos" style="color:#5b5"><b>${z.promo.toFixed(0)}%</b> napreduje</span>`;
+      if(z.stay>0)pmc+=`<span class="prob-pos" style="color:#ba5"><b>${z.stay.toFixed(0)}%</b> ostaje</span>`;
+      if(z.rele>0)pmc+=`<span class="prob-pos" style="color:#b55"><b>${z.rele.toFixed(0)}%</b> ispada</span>`;
       pmc+=`</div></div>`;
     });
     pmc+='</div>';
-    main.innerHTML+=`<div class="section"><div class="section-head">Vjerojatnosti pozicija</div><div class="section-body">${pb}${pmc}</div></div>`;
+    main.innerHTML+=`<div class="section"><div class="section-head">Vjerojatnosti</div><div class="section-body">${pb}${pmc}</div></div>`;
   }
 
   // remaining matches (use lgBase so locked filters still show)
