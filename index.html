@@ -45,6 +45,9 @@ tr.rele td:first-child{border-left:3px solid #a54}
 .tag-yellow{background:#2e2a1a;color:#ba5}.tag-blue{background:#1a1a2e;color:#77b}
 .tag-local{background:#2e2a1a;color:#ba5;margin-left:5px}
 
+/* mobile card layout for standings */
+.standings-cards{display:none}
+
 /* mobile */
 @media(max-width:700px){
   body{font-size:14px}
@@ -54,9 +57,42 @@ tr.rele td:first-child{border-left:3px solid #a54}
   th,td{padding:5px 5px;font-size:.72rem}
   .hide-mobile{display:none}
 
-  /* standings: use short names on mobile via data attr */
+  /* standings: hide table, show cards */
+  .standings-table{display:none}
+  .standings-cards{display:block}
   .player-name-full{display:none}
   .player-name-short{display:inline}
+
+  /* player card */
+  .p-card{padding:12px;border-bottom:1px solid #1e1e1e}
+  .p-card:last-child{border-bottom:none}
+  .p-card.me{background:#1a2233}
+  .p-card.promo{border-left:3px solid #4a7}
+  .p-card.rele{border-left:3px solid #a54}
+  .p-top{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .p-rank{width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.8rem;color:#aaa;background:#1a1a1a;border-radius:50%;flex-shrink:0}
+  .p-name{font-size:.92rem;font-weight:600;color:#eee;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .p-score-inline{font-size:1rem;font-weight:700;color:#eee;flex-shrink:0}
+  .p-score-inline small{font-weight:400;color:#555;font-size:.65rem;margin-left:2px}
+  .p-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:0;background:#151515;border-radius:5px;overflow:hidden}
+  .p-st{text-align:center;padding:6px 4px;border-right:1px solid #1e1e1e}
+  .p-st:last-child{border-right:none}
+  .p-st .v{font-size:.82rem;font-weight:600;color:#ccc}
+  .p-st .l{font-size:.55rem;color:#555;text-transform:uppercase;letter-spacing:.5px;margin-top:1px}
+  .p-tag{margin-top:6px}
+
+  /* prob cards */
+  .prob-cards{display:block!important}
+  .prob-table-desktop{display:none}
+  .prob-card{padding:10px 12px;border-bottom:1px solid #1e1e1e}
+  .prob-card:last-child{border-bottom:none}
+  .prob-card.me{background:#1a2233}
+  .prob-card-name{font-size:.82rem;font-weight:600;color:#ddd;margin-bottom:6px}
+  .prob-card-bar{height:20px;display:flex;border-radius:3px;overflow:hidden;background:#1a1a1a;margin-bottom:4px}
+  .prob-card-bar span{display:flex;align-items:center;justify-content:center;font-size:.58rem;font-weight:600;color:#000}
+  .prob-card-positions{display:flex;flex-wrap:wrap;gap:4px}
+  .prob-pos{font-size:.65rem;color:#888;background:#1a1a1a;padding:2px 6px;border-radius:3px}
+  .prob-pos b{color:#bbb}
 
   /* league tabs: horizontal scroll */
   .league-bar{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;gap:4px;padding:0 10px;-webkit-overflow-scrolling:touch}
@@ -307,17 +343,20 @@ function render(){
   // standings
   const n=lg.players.length,rs=n<=5?4:5;
   const sorted=[...lg.players].sort((a,b)=>{if(b.score!==a.score)return b.score-a.score;if(a.matches!==b.matches)return a.matches-b.matches;const[aw,al]=pr(a.games),[bw,bl]=pr(b.games);return(bw-bl)-(aw-al)});
-  let th=`<table><tr><th>#</th><th>Igrac</th><th>Bod</th><th class="hide-mobile">Odig</th><th class="hide-mobile">W:L</th><th class="hide-mobile">Gem</th><th class="hide-mobile">Poen</th>`;
+  // desktop table
+  let th=`<table class="standings-table"><tr><th>#</th><th>Igrac</th><th>Bod</th><th class="hide-mobile">Odig</th><th class="hide-mobile">W:L</th><th class="hide-mobile">Gem</th><th class="hide-mobile">Poen</th>`;
   if(an)th+=`<th class="hide-mobile">Pozicije</th><th class="hide-mobile">Prom%</th><th class="hide-mobile">Isp%</th><th></th>`;
   th+='</tr>';
+  // mobile cards
+  let cards='<div class="standings-cards">';
   sorted.forEach((p,i)=>{
     const rk=i+1,me=p.name===selectedPlayer,zone=rk<=2?'promo':rk>=rs?'rele':'';
     th+=`<tr class="${zone}${me?' me':''}"><td style="font-weight:700">${rk}</td><td><span class="player-name-full">${p.name}</span><span class="player-name-short">${sn(p.name)}</span>${me?' <span class="tag tag-blue">TI</span>':''}</td><td><b>${p.score}</b></td><td class="hide-mobile">${p.matches}</td><td class="hide-mobile">${p.wl}</td><td class="hide-mobile">${p.games}</td><td class="hide-mobile">${p.points}</td>`;
+    let st='';
     if(an){const g=an.gu[p.name];
       th+=`<td class="hide-mobile" style="color:#888">${g.bp}. - ${g.wp}.</td>`;
       th+=`<td class="hide-mobile" style="color:${g.pc>=100?'#5b5':g.pc>0?'#ba5':'#555'}">${g.pc.toFixed(0)}%</td>`;
       th+=`<td class="hide-mobile" style="color:${g.rc>=100?'#b55':g.rc>0?'#ba5':'#555'}">${g.rc.toFixed(0)}%</td>`;
-      let st='';
       if(g.gp)st='<span class="tag tag-green">NAPREDUJE</span>';
       else if(g.gr)st='<span class="tag tag-red">ISPADA</span>';
       else if(g.pc>0&&g.rc>0)st='<span class="tag tag-yellow">NEIZVJESNO</span>';
@@ -327,9 +366,16 @@ function render(){
       th+=`<td>${st}</td>`;
     }
     th+='</tr>';
+    // card for mobile
+    cards+=`<div class="p-card${me?' me':''} ${zone}">`;
+    cards+=`<div class="p-top"><div class="p-rank">${rk}</div><div class="p-name">${p.name}${me?' <span class="tag tag-blue">TI</span>':''}</div><div class="p-score-inline">${p.score}<small>bod</small></div></div>`;
+    cards+=`<div class="p-stats"><div class="p-st"><div class="v">${p.matches}</div><div class="l">Odigrano</div></div><div class="p-st"><div class="v">${p.wl}</div><div class="l">W:L</div></div><div class="p-st"><div class="v">${p.games}</div><div class="l">Gem</div></div><div class="p-st"><div class="v">${p.points}</div><div class="l">Poeni</div></div></div>`;
+    if(st)cards+=`<div class="p-tag">${st}</div>`;
+    cards+=`</div>`;
   });
   th+='</table>';
-  main.innerHTML+=`<div class="section"><div class="section-head">Poredak${an?(an.approx?' (~aproksimacija)':''):' (konacno)'}</div><div class="section-body">${th}</div></div>`;
+  cards+='</div>';
+  main.innerHTML+=`<div class="section"><div class="section-head">Poredak${an?(an.approx?' (~aproksimacija)':''):' (konacno)'}</div><div class="section-body">${th}${cards}</div></div>`;
 
   if(an){
     // stats
@@ -350,18 +396,30 @@ function render(){
 
     // probabilities
     const colors=['#b9922a','#7a7a7a','#8a5a1a','#8a3333','#5a2222','#3a1a5a'];
-    let pb=`<table><tr><th>Igrac</th>`;
+    const posLabels=['1.','2.','3.','4.','5.','6.','7.','8.'];
+    // desktop table
+    let pb=`<div class="prob-table-desktop"><table><tr><th>Igrac</th>`;
     for(let i=1;i<=n;i++)pb+=`<th style="text-align:center;width:50px">${i}.</th>`;
-    pb+='<th class="hide-mobile" style="min-width:160px"></th></tr>';
+    pb+='<th style="min-width:160px"></th></tr>';
     sorted.forEach(p=>{const me=p.name===selectedPlayer;
       pb+=`<tr${me?' class="me"':''}><td>${sn(p.name)}</td>`;
       for(let i=1;i<=n;i++){const c=an.pc[p.name][i]||0,pct=(c/an.tot*100).toFixed(0);pb+=`<td style="text-align:center;color:${c?'#bbb':'#444'};font-weight:${c?'600':'400'}">${pct}%</td>`}
-      pb+=`<td class="hide-mobile"><div class="pbar">`;
+      pb+=`<td><div class="pbar">`;
       for(let i=1;i<=n;i++){const c=an.pc[p.name][i]||0,pct=c/an.tot*100;if(pct>0)pb+=`<span style="width:${pct}%;background:${colors[i-1]}">${pct>=8?pct.toFixed(0)+'%':''}</span>`}
       pb+=`</div></td></tr>`;
     });
-    pb+='</table>';
-    main.innerHTML+=`<div class="section"><div class="section-head">Vjerojatnosti pozicija</div><div class="section-body"><div class="combos-scroll">${pb}</div></div></div>`;
+    pb+='</table></div>';
+    // mobile cards
+    let pmc='<div class="prob-cards" style="display:none">';
+    sorted.forEach(p=>{const me=p.name===selectedPlayer;
+      pmc+=`<div class="prob-card${me?' me':''}"><div class="prob-card-name">${p.name}</div><div class="prob-card-bar">`;
+      for(let i=1;i<=n;i++){const c=an.pc[p.name][i]||0,pct=c/an.tot*100;if(pct>0)pmc+=`<span style="width:${pct}%;background:${colors[i-1]}">${pct>=6?pct.toFixed(0)+'%':''}</span>`}
+      pmc+=`</div><div class="prob-card-positions">`;
+      for(let i=1;i<=n;i++){const c=an.pc[p.name][i]||0,pct=(c/an.tot*100).toFixed(0);if(+pct>0)pmc+=`<span class="prob-pos">${posLabels[i-1]} <b>${pct}%</b></span>`}
+      pmc+=`</div></div>`;
+    });
+    pmc+='</div>';
+    main.innerHTML+=`<div class="section"><div class="section-head">Vjerojatnosti pozicija</div><div class="section-body">${pb}${pmc}</div></div>`;
   }
 
   // remaining matches
