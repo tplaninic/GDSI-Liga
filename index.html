@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="hr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GDSI Liga</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#111;color:#ddd;min-height:100vh}
+a{color:#7ab}
+
+/* header */
+header{background:#181818;border-bottom:1px solid #282828;padding:12px 16px;text-align:center}
+header h1{font-size:1.1rem;font-weight:700;color:#eee;letter-spacing:-.3px;margin-bottom:10px}
+
+/* league tabs - prominent, centered, scrollable on mobile */
+.league-bar{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;padding:0 8px}
+.tab{padding:8px 18px;background:#1e1e1e;border:1px solid #2a2a2a;color:#888;cursor:pointer;font-size:.82rem;border-radius:5px;transition:all .15s;white-space:nowrap}
+.tab:hover{background:#252525;color:#bbb;border-color:#383838}
+.tab.active{background:#2a3a4a;border-color:#4a6a8a;color:#cde;font-weight:600}
+.tab .rem{font-size:.62rem;background:#3a2a1a;color:#da7;padding:1px 5px;border-radius:3px;margin-left:5px}
+
+#status{text-align:center;padding:8px;font-size:.78rem;color:#666}
+.wrap{max-width:1300px;margin:0 auto;padding:12px}
+.section{background:#181818;border:1px solid #232323;border-radius:6px;margin-bottom:14px;overflow:hidden}
+.section-head{padding:11px 14px;font-size:.82rem;font-weight:600;color:#aaa;border-bottom:1px solid #232323;display:flex;align-items:center;justify-content:space-between}
+.section-head .note{font-size:.68rem;color:#666;font-weight:400}
+.section-body{padding:0}
+
+/* player picker */
+.picker{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #232323}
+.picker label{font-size:.78rem;color:#777}
+.picker select{padding:5px 10px;background:#222;border:1px solid #333;color:#ccc;border-radius:4px;font-size:.8rem}
+
+/* tables - responsive */
+table{width:100%;border-collapse:collapse;font-size:.8rem}
+th{text-align:left;padding:6px 10px;color:#666;font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.4px}
+td{padding:6px 10px;border-top:1px solid #1e1e1e}
+tr.me td{background:#1a2233}
+tr.promo td:first-child{border-left:3px solid #4a7}
+tr.rele td:first-child{border-left:3px solid #a54}
+.tag{display:inline-block;padding:1px 6px;border-radius:3px;font-size:.65rem;font-weight:600}
+.tag-green{background:#1a2e1a;color:#5b5}.tag-red{background:#2e1a1a;color:#b55}
+.tag-yellow{background:#2e2a1a;color:#ba5}.tag-blue{background:#1a1a2e;color:#77b}
+.tag-local{background:#2e2a1a;color:#ba5;margin-left:5px}
+
+/* mobile */
+@media(max-width:700px){
+  body{font-size:14px}
+  .wrap{padding:6px}
+  .section{border-radius:4px;margin-bottom:8px;border-left:none;border-right:none;border-radius:0}
+  .section-head{padding:10px 10px;font-size:.78rem}
+  th,td{padding:5px 5px;font-size:.72rem}
+  .hide-mobile{display:none}
+
+  /* standings: use short names on mobile via data attr */
+  .player-name-full{display:none}
+  .player-name-short{display:inline}
+
+  /* league tabs: horizontal scroll */
+  .league-bar{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;gap:4px;padding:0 10px;-webkit-overflow-scrolling:touch}
+  .tab{padding:8px 14px;font-size:.78rem;flex-shrink:0}
+
+  /* filter buttons: stack 2-col grid */
+  .filter-row{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+  .fbtn{padding:8px 6px;font-size:.72rem;text-align:center}
+  .fbtn-full{grid-column:1/-1}
+
+  /* score entry full width */
+  .score-entry{max-width:100%;padding:12px}
+  .score-header .team-label{font-size:.72rem}
+  .score-gem{gap:4px}
+  .score-gem .gem-num{width:36px;font-size:.65rem}
+  .score-gem input{padding:8px 4px;font-size:.95rem}
+  .score-gem .dash{width:16px}
+  .btn-save{padding:10px 20px;font-size:.82rem;width:100%}
+  .score-actions{flex-direction:column;gap:4px}
+
+  /* match block */
+  .match-block{padding:12px 10px}
+  .match-teams{font-size:.82rem;flex-direction:column;align-items:flex-start;gap:2px}
+  .match-teams .v{font-size:.65rem}
+
+  /* stats */
+  .stats{gap:6px;padding:10px 8px}
+  .stat{min-width:0;padding:8px 6px;flex-basis:calc(50% - 6px)}
+  .stat .val{font-size:1.1rem}
+  .stat .lbl{font-size:.6rem}
+
+  /* local strip */
+  .local-strip{padding:8px 10px;flex-direction:column;align-items:flex-start;gap:6px}
+  .local-strip .info{font-size:.72rem}
+
+  /* prob bars */
+  .pbar{height:14px}
+  .pbar span{font-size:.5rem}
+
+  /* ranking combos: horizontal scroll */
+  .combos-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+
+  /* picker */
+  .picker{flex-direction:column;align-items:flex-start;gap:6px;padding:10px}
+  .picker select{width:100%;padding:8px 10px}
+
+  /* header */
+  header{padding:10px 10px}
+  header h1{font-size:1rem;margin-bottom:8px}
+}
+
+/* desktop: hide short name */
+.player-name-short{display:none}
+
+/* prob bars */
+.pbar{height:18px;display:flex;border-radius:3px;overflow:hidden;background:#1a1a1a}
+.pbar span{display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:600;color:#000}
+
+/* remaining matches */
+.match-block{border-bottom:1px solid #232323;padding:14px}
+.match-block:last-child{border-bottom:none}
+.match-teams{font-size:.88rem;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.match-teams .v{color:#555;font-weight:400;font-size:.75rem}
+.filter-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px}
+.fbtn{padding:5px 12px;background:#222;border:1px solid #333;color:#888;border-radius:4px;cursor:pointer;font-size:.75rem;transition:all .12s}
+.fbtn:hover{border-color:#555;color:#bbb}
+.fbtn.on{background:#2a3a4a;border-color:#4a6a8a;color:#8ab}
+
+/* score entry */
+.score-entry{background:#1a1a1a;border:1px solid #282828;border-radius:5px;padding:14px 16px;max-width:360px}
+.score-header{display:flex;align-items:center;margin-bottom:10px;gap:8px}
+.score-header .team-label{flex:1;font-size:.78rem;font-weight:600;color:#999}
+.score-header .team-label:last-child{text-align:right}
+.score-header .vs-label{font-size:.65rem;color:#444;width:30px;text-align:center}
+.score-gem{display:flex;align-items:center;margin-bottom:6px;gap:8px}
+.score-gem .gem-num{font-size:.7rem;color:#555;width:44px;flex-shrink:0}
+.score-gem input{width:48px;padding:6px;background:#222;border:1px solid #333;color:#ddd;border-radius:3px;text-align:center;font-size:.9rem;font-weight:600;flex:1}
+.score-gem input:focus{outline:none;border-color:#4a6a8a}
+.score-gem .dash{color:#444;font-weight:700;width:30px;text-align:center;font-size:1rem}
+.score-gem.optional input{border-color:#262626;color:#666}
+.score-gem.optional .gem-num{color:#3a3a3a}
+.score-gem.optional .dash{color:#333}
+.score-actions{margin-top:12px;display:flex;gap:8px;align-items:center}
+.btn-save{padding:6px 16px;background:#2a3a2a;border:1px solid #3a5a3a;color:#7b7;border-radius:4px;cursor:pointer;font-size:.78rem;font-weight:600}
+.btn-save:hover{background:#3a4a3a}
+.btn-remove{padding:5px 14px;background:#2a1a1a;border:1px solid #5a3a3a;color:#b77;border-radius:4px;cursor:pointer;font-size:.75rem;font-weight:600}
+.btn-remove:hover{background:#3a2a2a}
+.score-note{font-size:.68rem;color:#555}
+
+/* stats grid */
+.stats{display:flex;gap:8px;flex-wrap:wrap;padding:12px 14px}
+.stat{background:#1a1a1a;border:1px solid #252525;border-radius:4px;padding:10px 14px;text-align:center;min-width:100px;flex:1}
+.stat .val{font-size:1.3rem;font-weight:700;color:#ddd}
+.stat .lbl{font-size:.66rem;color:#666;margin-top:2px}
+
+/* local results strip */
+.local-strip{padding:10px 14px;background:#1a1d14;border-bottom:1px solid #2a2d1a;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.local-strip .info{font-size:.78rem;color:#aa8}
+.local-strip .detail{font-size:.73rem;color:#887}
+
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>GDSI Liga</h1>
+  <div class="league-bar" id="tabs"></div>
+</header>
+<div id="status">Ucitavanje...</div>
+<div class="wrap hidden" id="main"></div>
+
+<script>
+let leagues={},currentLeague=null,matchFilters={},selectedPlayer=null,allScenarios={},allAnalysis={};
+let localResults=JSON.parse(localStorage.getItem('gdsi_local')||'{}');
+function saveLocal(){localStorage.setItem('gdsi_local',JSON.stringify(localResults))}
+
+function parseWorkbook(wb){
+  leagues={};
+  wb.SheetNames.filter(s=>/^\d+\. Liga$/.test(s)).forEach(sn=>{
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:""});
+    const lg=parseSheet(rows); if(lg) leagues[sn]=lg;
+  });
+}
+function parseSheet(rows){
+  const players=[],matches=[],remaining=[],names=[];
+  for(const row of rows){if(!row)continue;const r=row[20],n=row[21];
+    if(r&&!isNaN(+r)&&n&&String(n).trim()){const nm=String(n).trim();
+      players.push({rank:+r,name:nm,matches:+(row[22])||0,wl:String(row[23]||"0:0").replace(/ /g,''),games:String(row[24]||"0:0").replace(/ /g,''),points:String(row[25]||"0:0").replace(/ /g,''),score:+(row[26])||0});
+      names.push(nm);
+    }}
+  for(const row of rows){if(!row)continue;const mid=row[6];if(!mid||mid==='ID')continue;const id=+mid;if(isNaN(id))continue;
+    const t1s=String(row[8]||'').trim(),t2s=String(row[10]||'').trim();if(!t1s||!t2s)continue;
+    const t1=t1s.split('/').map(s=>resolve(s.trim(),names)),t2=t2s.split('/').map(s=>resolve(s.trim(),names));
+    const h=row[12]!==''&&row[12]!=null;
+    if(h){const sc=[[+(row[12])||0,+(row[13])||0],[+(row[14])||0,+(row[15])||0]];
+      if(row[16]!==''&&row[16]!=null)sc.push([+(row[16])||0,+(row[17])||0]);
+      matches.push({id,team1:t1,team2:t2,scores:sc});
+    }else remaining.push({id,team1:t1,team2:t2});
+  }
+  return players.length?{players,matches,remaining}:null;
+}
+function resolve(p,names){if(names.includes(p))return p;return names.find(f=>f.startsWith(p)||p.startsWith(f.substring(0,p.length)))||p}
+function pr(s){if(!s||s==='0:0')return[0,0];const p=s.split(':');return[+p[0]||0,+p[1]||0]}
+function pts(w,l){return w===2&&l===0?{w:4,l:1}:w===2&&l===1?{w:3,l:2}:{w:0,l:0}}
+function sn(f){const p=f.split(' ');return p.length>1?p[p.length-1]:f}
+
+function getEff(ln){
+  const lg=leagues[ln];if(!lg)return null;const loc=localResults[ln]||{};if(!Object.keys(loc).length)return lg;
+  const pl=lg.players.map(p=>({...p})),pm={};pl.forEach(p=>{pm[p.name]=p});
+  const nm=[...lg.matches],nr=[];
+  lg.remaining.forEach(m=>{
+    if(loc[m.id]){const lr=loc[m.id];nm.push({...m,scores:lr.scores,local:true});
+      let g1=0,g2=0,p1=0,p2=0;lr.scores.forEach(([a,b])=>{a>b?g1++:g2++;p1+=a;p2+=b});
+      const pt=g1>g2?pts(g1,g2):pts(g2,g1),wt=g1>g2?m.team1:m.team2,lt=g1>g2?m.team2:m.team1,wg=Math.max(g1,g2),lg2=Math.min(g1,g2);
+      wt.forEach(n=>{const p=pm[n];if(p){p.score+=pt.w;p.matches++;const[gw,gl]=pr(p.games);p.games=`${gw+wg}:${gl+lg2}`;const[pw,pl2]=pr(p.points);const wp=wt===m.team1?p1:p2,lp=wt===m.team1?p2:p1;p.points=`${pw+wp}:${pl2+lp}`;const[ww,wl]=pr(p.wl);p.wl=`${ww+1}:${wl}`}});
+      lt.forEach(n=>{const p=pm[n];if(p){p.score+=pt.l;p.matches++;const[gw,gl]=pr(p.games);p.games=`${gw+lg2}:${gl+wg}`;const[pw,pl2]=pr(p.points);const wp=lt===m.team1?p1:p2,lp=lt===m.team1?p2:p1;p.points=`${pw+wp}:${pl2+lp}`;const[ww,wl]=pr(p.wl);p.wl=`${ww}:${wl+1}`}});
+    }else nr.push(m);
+  });
+  return{players:pl,matches:nm,remaining:nr};
+}
+
+function calcScenarios(ln){
+  const lg=getEff(ln);if(!lg||!lg.remaining.length)return null;
+  const outs=[{l:'2-0',a:2,b:0},{l:'2-1',a:2,b:1},{l:'1-2',a:1,b:2},{l:'0-2',a:0,b:2}];
+  const labels=['2-0','2-1','1-2','0-2'];
+  const nm=lg.remaining.length;
+  // Count how many matches are free (not locked by filter)
+  let freeCount=0;for(let m=0;m<nm;m++){if(matchFilters[m]===undefined)freeCount++}
+  const full=freeCount<=8,tot=full?4**freeCount:50000,sc=[];
+  for(let i=0;i<tot;i++){
+    const mo=[];
+    let freeIdx=0;
+    for(let m=0;m<nm;m++){
+      if(matchFilters[m]!==undefined){
+        // Locked outcome
+        mo.push(outs[matchFilters[m]]);
+      }else{
+        // Free outcome - enumerate or random
+        if(full){
+          let t=Math.floor(i/4**freeIdx)%4;
+          mo.push(outs[t]);
+          freeIdx++;
+        }else{
+          mo.push(outs[Math.random()*4|0]);
+        }
+      }
+    }
+    const ps={};lg.players.forEach(p=>{ps[p.name]={s:p.score,m:p.matches,g:pr(p.games),p:pr(p.points)}});
+    mo.forEach((o,i)=>{const mt=lg.remaining[i],t1=mt.team1,t2=mt.team2;
+      if(o.a>o.b){const pt=pts(o.a,o.b);t1.forEach(n=>{if(ps[n]){ps[n].s+=pt.w;ps[n].m++;ps[n].g[0]+=o.a;ps[n].g[1]+=o.b}});t2.forEach(n=>{if(ps[n]){ps[n].s+=pt.l;ps[n].m++;ps[n].g[0]+=o.b;ps[n].g[1]+=o.a}})}
+      else{const pt=pts(o.b,o.a);t2.forEach(n=>{if(ps[n]){ps[n].s+=pt.w;ps[n].m++;ps[n].g[0]+=o.b;ps[n].g[1]+=o.a}});t1.forEach(n=>{if(ps[n]){ps[n].s+=pt.l;ps[n].m++;ps[n].g[0]+=o.a;ps[n].g[1]+=o.b}})}
+    });
+    const rk=Object.entries(ps).map(([n,s])=>({n,s:s.s,m:s.m,gd:s.g[0]-s.g[1],pd:s.p[0]-s.p[1],gr:s.g[1]?s.g[0]/s.g[1]:s.g[0]?999:0,pr2:s.p[1]?s.p[0]/s.p[1]:s.p[0]?999:0}));
+    rk.sort((a,b)=>b.s-a.s||a.m-b.m||b.gd-a.gd||b.pd-a.pd||b.gr-a.gr||b.pr2-a.pr2);
+    sc.push({mo:mo.map((o,j)=>({l:o.l,mt:lg.remaining[j]})),rk:rk.map(r=>r.n),sc:rk.reduce((a,r)=>{a[r.n]=r.s;return a},{})});
+  }
+  return{scenarios:sc,approx:!full};
+}
+function analyze(res,lg){
+  if(!res)return null;const{scenarios:sc,approx}=res;if(!sc.length)return null;
+  const n=lg.players.length,pc={},cb={};
+  lg.players.forEach(p=>{pc[p.name]={};for(let i=1;i<=n;i++)pc[p.name][i]=0});
+  sc.forEach(s=>{s.rk.forEach((nm,i)=>{pc[nm][i+1]++});const k=s.rk.join('|');if(!cb[k])cb[k]={c:0,rk:s.rk,sc:s.sc};cb[k].c++});
+  const tot=sc.length,rs=n<=5?4:5,gu={};
+  lg.players.forEach(p=>{const pos=Object.entries(pc[p.name]).filter(([,c])=>c>0).map(([i])=>+i);
+    let pro=(pc[p.name][1]||0)+(pc[p.name][2]||0),rel=0;for(let i=rs;i<=n;i++)rel+=(pc[p.name][i]||0);
+    gu[p.name]={bp:Math.min(...pos),wp:Math.max(...pos),gp:Math.max(...pos)<=2,gr:Math.min(...pos)>=rs,pc:pro/tot*100,rc:rel/tot*100};
+  });
+  return{pc,tot,gu,approx,combos:Object.values(cb).sort((a,b)=>b.c-a.c)};
+}
+
+function recalc(){
+  Object.keys(leagues).forEach(l=>{const e=getEff(l),r=calcScenarios(l);
+    if(r){allScenarios[l]=r;allAnalysis[l]=analyze(r,e)}else{allScenarios[l]=null;allAnalysis[l]=null}});
+  render();
+}
+
+// ========= RENDER =========
+function render(){
+  // tabs
+  const tabs=document.getElementById('tabs');tabs.innerHTML='';
+  Object.keys(leagues).forEach(name=>{
+    const b=document.createElement('button');b.className='tab'+(name===currentLeague?' active':'');
+    const e=getEff(name),r=e?e.remaining.length:0;
+    b.innerHTML=name+(r?`<span class="rem">${r}</span>`:'');
+    b.onclick=()=>{currentLeague=name;matchFilters={};recalc()};tabs.appendChild(b);
+  });
+
+  const main=document.getElementById('main');main.innerHTML='';
+  const lg=getEff(currentLeague);if(!lg)return;
+  const an=allAnalysis[currentLeague];
+
+  // player picker
+  main.innerHTML+=`<div class="section"><div class="picker"><label>Oznaci sebe:</label><select onchange="selectedPlayer=this.value||null;render()"><option value="">--</option>${lg.players.map(p=>`<option value="${p.name}"${selectedPlayer===p.name?' selected':''}>${p.name}</option>`).join('')}</select></div></div>`;
+
+  // local results banner
+  const loc=localResults[currentLeague]||{};
+  if(Object.keys(loc).length){
+    let lh='';Object.entries(loc).forEach(([mid,d])=>{
+      const m=leagues[currentLeague].remaining.find(x=>x.id===+mid);if(!m)return;
+      const ss=d.scores.map(([a,b])=>a+':'+b).join(', ');let g1=0,g2=0;d.scores.forEach(([a,b])=>{a>b?g1++:g2++});
+      lh+=`<div class="local-strip"><div><span class="info">${sn(m.team1[0])}/${sn(m.team1[1])} vs ${sn(m.team2[0])}/${sn(m.team2[1])}</span> <span class="detail">${ss} (${g1}:${g2})</span></div><button class="btn-remove" onclick="delete localResults['${currentLeague}'][${mid}];if(!Object.keys(localResults['${currentLeague}']).length)delete localResults['${currentLeague}'];saveLocal();recalc()">Ukloni</button></div>`;
+    });
+    main.innerHTML+=`<div class="section"><div class="section-head">Lokalno uneseni rezultati <span class="note">nestaju kad osvjezis stranicu</span></div>${lh}</div>`;
+  }
+
+  // standings
+  const n=lg.players.length,rs=n<=5?4:5;
+  const sorted=[...lg.players].sort((a,b)=>{if(b.score!==a.score)return b.score-a.score;if(a.matches!==b.matches)return a.matches-b.matches;const[aw,al]=pr(a.games),[bw,bl]=pr(b.games);return(bw-bl)-(aw-al)});
+  let th=`<table><tr><th>#</th><th>Igrac</th><th>Bod</th><th class="hide-mobile">Odig</th><th class="hide-mobile">W:L</th><th class="hide-mobile">Gem</th><th class="hide-mobile">Poen</th>`;
+  if(an)th+=`<th class="hide-mobile">Pozicije</th><th class="hide-mobile">Prom%</th><th class="hide-mobile">Isp%</th><th></th>`;
+  th+='</tr>';
+  sorted.forEach((p,i)=>{
+    const rk=i+1,me=p.name===selectedPlayer,zone=rk<=2?'promo':rk>=rs?'rele':'';
+    th+=`<tr class="${zone}${me?' me':''}"><td style="font-weight:700">${rk}</td><td><span class="player-name-full">${p.name}</span><span class="player-name-short">${sn(p.name)}</span>${me?' <span class="tag tag-blue">TI</span>':''}</td><td><b>${p.score}</b></td><td class="hide-mobile">${p.matches}</td><td class="hide-mobile">${p.wl}</td><td class="hide-mobile">${p.games}</td><td class="hide-mobile">${p.points}</td>`;
+    if(an){const g=an.gu[p.name];
+      th+=`<td class="hide-mobile" style="color:#888">${g.bp}. - ${g.wp}.</td>`;
+      th+=`<td class="hide-mobile" style="color:${g.pc>=100?'#5b5':g.pc>0?'#ba5':'#555'}">${g.pc.toFixed(0)}%</td>`;
+      th+=`<td class="hide-mobile" style="color:${g.rc>=100?'#b55':g.rc>0?'#ba5':'#555'}">${g.rc.toFixed(0)}%</td>`;
+      let st='';
+      if(g.gp)st='<span class="tag tag-green">NAPREDUJE</span>';
+      else if(g.gr)st='<span class="tag tag-red">ISPADA</span>';
+      else if(g.pc>0&&g.rc>0)st='<span class="tag tag-yellow">NEIZVJESNO</span>';
+      else if(g.pc>0)st='<span class="tag tag-green">MOZE NAPREDOVATI</span>';
+      else if(g.rc>0)st='<span class="tag tag-red">MOZE ISPASTI</span>';
+      else st='<span class="tag tag-blue">OSTAJE</span>';
+      th+=`<td>${st}</td>`;
+    }
+    th+='</tr>';
+  });
+  th+='</table>';
+  main.innerHTML+=`<div class="section"><div class="section-head">Poredak${an?(an.approx?' (~aproksimacija)':''):' (konacno)'}</div><div class="section-body">${th}</div></div>`;
+
+  if(an){
+    // stats
+    let sh=`<div class="stats">`;
+    sh+=`<div class="stat"><div class="val">${an.tot.toLocaleString()}</div><div class="lbl">Scenarija${an.approx?' (uzorak)':''}</div></div>`;
+    sh+=`<div class="stat"><div class="val">${an.combos.length}</div><div class="lbl">Razlicitih poredaka</div></div>`;
+    sh+=`<div class="stat"><div class="val">${lg.remaining.length}</div><div class="lbl">Preostalih susreta</div></div>`;
+    if(selectedPlayer&&an.gu[selectedPlayer]){const g=an.gu[selectedPlayer];
+      sh+=`<div class="stat"><div class="val" style="color:#5b5">${g.pc.toFixed(0)}%</div><div class="lbl">Sansa za promociju</div></div>`;
+      sh+=`<div class="stat"><div class="val" style="color:${g.rc>0?'#b55':'#5b5'}">${g.rc.toFixed(0)}%</div><div class="lbl">Rizik ispadanja</div></div>`;
+    }
+    sh+='</div>';
+    // guaranteed
+    const guar=[];
+    lg.players.forEach(p=>{const g=an.gu[p.name];if(g.gp)guar.push(`<span style="color:#5b5">${sn(p.name)} napreduje</span>`);if(g.gr)guar.push(`<span style="color:#b55">${sn(p.name)} ispada</span>`)});
+    if(guar.length)sh+=`<div style="padding:0 16px 14px;font-size:.8rem;color:#888">Sigurno: ${guar.join(' / ')}</div>`;
+    main.innerHTML+=`<div class="section">${sh}</div>`;
+
+    // probabilities
+    const colors=['#b9922a','#7a7a7a','#8a5a1a','#8a3333','#5a2222','#3a1a5a'];
+    let pb=`<table><tr><th>Igrac</th>`;
+    for(let i=1;i<=n;i++)pb+=`<th style="text-align:center;width:50px">${i}.</th>`;
+    pb+='<th class="hide-mobile" style="min-width:160px"></th></tr>';
+    sorted.forEach(p=>{const me=p.name===selectedPlayer;
+      pb+=`<tr${me?' class="me"':''}><td>${sn(p.name)}</td>`;
+      for(let i=1;i<=n;i++){const c=an.pc[p.name][i]||0,pct=(c/an.tot*100).toFixed(0);pb+=`<td style="text-align:center;color:${c?'#bbb':'#444'};font-weight:${c?'600':'400'}">${pct}%</td>`}
+      pb+=`<td class="hide-mobile"><div class="pbar">`;
+      for(let i=1;i<=n;i++){const c=an.pc[p.name][i]||0,pct=c/an.tot*100;if(pct>0)pb+=`<span style="width:${pct}%;background:${colors[i-1]}">${pct>=8?pct.toFixed(0)+'%':''}</span>`}
+      pb+=`</div></td></tr>`;
+    });
+    pb+='</table>';
+    main.innerHTML+=`<div class="section"><div class="section-head">Vjerojatnosti pozicija</div><div class="section-body"><div class="combos-scroll">${pb}</div></div></div>`;
+  }
+
+  // remaining matches
+  if(lg.remaining.length){
+    let rm='';
+    lg.remaining.forEach((m,i)=>{
+      const t1=m.team1.map(sn),t2=m.team2.map(sn);
+      const t1j=t1.join(' / '),t2j=t2.join(' / ');
+      rm+=`<div class="match-block">
+        <div class="match-teams"><span>${t1j}</span><span class="v">vs</span><span>${t2j}</span></div>
+        <div class="filter-row">
+          <button class="fbtn fbtn-full${matchFilters[i]===undefined?' on':''}" onclick="setO(${i},'all')">Svi ishodi</button>
+          <button class="fbtn${matchFilters[i]===0?' on':''}" onclick="setO(${i},0)">${t1j} 2:0</button>
+          <button class="fbtn${matchFilters[i]===1?' on':''}" onclick="setO(${i},1)">${t1j} 2:1</button>
+          <button class="fbtn${matchFilters[i]===2?' on':''}" onclick="setO(${i},2)">${t2j} 2:1</button>
+          <button class="fbtn${matchFilters[i]===3?' on':''}" onclick="setO(${i},3)">${t2j} 2:0</button>
+        </div>
+        <div class="score-entry">
+          <div class="score-header"><span class="team-label">${t1j}</span><span class="vs-label">vs</span><span class="team-label">${t2j}</span></div>
+          <div class="score-gem"><span class="gem-num">1. gem</span><input id="s${m.id}a1" type="number" inputmode="numeric" min="0"><span class="dash">-</span><input id="s${m.id}b1" type="number" inputmode="numeric" min="0"></div>
+          <div class="score-gem"><span class="gem-num">2. gem</span><input id="s${m.id}a2" type="number" inputmode="numeric" min="0"><span class="dash">-</span><input id="s${m.id}b2" type="number" inputmode="numeric" min="0"></div>
+          <div class="score-gem optional"><span class="gem-num">3. gem</span><input id="s${m.id}a3" type="number" inputmode="numeric" min="0" placeholder="-"><span class="dash">-</span><input id="s${m.id}b3" type="number" inputmode="numeric" min="0" placeholder="-"></div>
+          <div class="score-actions"><button class="btn-save" onclick="saveScore('${currentLeague}',${m.id})">Spremi rezultat</button><span class="score-note">lokalno</span></div>
+        </div>
+      </div>`;
+    });
+    main.innerHTML+=`<div class="section"><div class="section-head">Preostali susreti (${lg.remaining.length})</div>${rm}</div>`;
+  }
+
+  // ranking combos
+  if(an&&an.combos.length){
+    const lim=Math.min(an.combos.length,25);
+    let rc=`<table><tr><th>Sansa</th>`;for(let i=1;i<=n;i++)rc+=`<th>${i}.</th>`;rc+='</tr>';
+    an.combos.slice(0,lim).forEach(c=>{
+      rc+=`<tr><td><b>${(c.c/an.tot*100).toFixed(1)}%</b></td>`;
+      c.rk.forEach((nm,i)=>{const me=nm===selectedPlayer,pos=i+1;rc+=`<td style="color:${me?'#7ab':pos<=2?'#5b5':pos>=rs?'#b55':'#888'};${me?'font-weight:700':''}">${sn(nm)} (${c.sc[nm]})</td>`});
+      rc+='</tr>';
+    });
+    rc+='</table>';
+    main.innerHTML+=`<div class="section"><div class="section-head">Moguce ljestvice${an.combos.length>lim?` (prvih ${lim} od ${an.combos.length})`:''}</div><div class="section-body"><div class="combos-scroll">${rc}</div></div></div>`;
+  }
+
+  // completed
+  if(lg.matches.length){
+    let cm=`<table><tr><th>Tim 1</th><th></th><th>Tim 2</th><th>Gem rezultati</th><th></th></tr>`;
+    lg.matches.forEach(m=>{let g1=0,g2=0;m.scores.forEach(([a,b])=>{a>b?g1++:g2++});const w=g1>g2?1:2;
+      cm+=`<tr><td style="${w===1?'color:#5b5;font-weight:600':''}">${m.team1.map(sn).join(' / ')}</td><td style="color:#444">vs</td><td style="${w===2?'color:#5b5;font-weight:600':''}">${m.team2.map(sn).join(' / ')}</td><td>${m.scores.map(([a,b])=>a+':'+b).join(', ')}</td><td><b>${g1}:${g2}</b>${m.local?'<span class="tag-local">lok.</span>':''}</td></tr>`;
+    });
+    cm+='</table>';
+    main.innerHTML+=`<div class="section"><div class="section-head">Odigrani susreti (${lg.matches.length})</div><div class="section-body"><div class="combos-scroll">${cm}</div></div></div>`;
+  }
+}
+
+function setO(i,o){if(o==='all')delete matchFilters[i];else matchFilters[i]=o;recalc()}
+
+function saveScore(ln,mid){
+  const v=id=>{const el=document.getElementById(id);return el&&el.value!==''?+el.value:null};
+  const a1=v('s'+mid+'a1'),b1=v('s'+mid+'b1'),a2=v('s'+mid+'a2'),b2=v('s'+mid+'b2'),a3=v('s'+mid+'a3'),b3=v('s'+mid+'b3');
+  if(a1===null||b1===null||a2===null||b2===null){alert('Unesi barem prva dva gema.');return}
+  const sc=[[a1,b1],[a2,b2]];if(a3!==null&&b3!==null)sc.push([a3,b3]);
+  let g1=0,g2=0;sc.forEach(([a,b])=>{a>b?g1++:b>a?g2++:0});
+  if(g1<2&&g2<2){alert('Rezultat mora biti 2:0, 2:1, 1:2 ili 0:2');return}
+  if(!localResults[ln])localResults[ln]={};localResults[ln][mid]={scores:sc};saveLocal();recalc();
+}
+
+const WORKER_URL='https://empty-breeze-43cb.tomislav-planini.workers.dev';
+async function load(){
+  try{
+    const r=await fetch(WORKER_URL||'/api/excel');if(!r.ok)throw new Error('HTTP '+r.status);
+    const ct=r.headers.get('Content-Type')||'';if(ct.includes('json')){const e=await r.json();throw new Error(e.error||'?')}
+    const wb=XLSX.read(new Uint8Array(await r.arrayBuffer()),{type:'array'});parseWorkbook(wb);
+    // Remove local results for matches that now have real scores in the Excel
+    let cleaned=false;
+    Object.keys(localResults).forEach(ln=>{
+      const lg=leagues[ln];if(!lg)return;
+      const remainIds=new Set(lg.remaining.map(m=>m.id));
+      Object.keys(localResults[ln]).forEach(mid=>{
+        if(!remainIds.has(+mid)){delete localResults[ln][mid];cleaned=true}
+      });
+      if(!Object.keys(localResults[ln]).length)delete localResults[ln];
+    });
+    if(cleaned)saveLocal();
+    document.getElementById('status').innerHTML=`<span style="color:#5b5">Podaci ucitani</span> <span style="color:#555">${new Date().toLocaleTimeString()}</span>`;
+    document.getElementById('main').classList.remove('hidden');
+    if(!currentLeague||!leagues[currentLeague]){const w=Object.keys(leagues).find(l=>getEff(l).remaining.length>0);currentLeague=w||Object.keys(leagues)[0]}
+    matchFilters={};recalc();
+  }catch(e){document.getElementById('status').innerHTML=`<span style="color:#b55">Greska: ${e.message}</span>`}
+}
+load();
+</script>
+</body>
+</html>
