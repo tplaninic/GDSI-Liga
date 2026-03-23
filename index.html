@@ -139,6 +139,12 @@ tr.rele td:first-child{border-left:3px solid #a54}
   .picker{flex-direction:column;align-items:flex-start;gap:6px;padding:10px}
   .picker select{width:100%;padding:8px 10px}
 
+  /* scheduler */
+  .sched-players{gap:5px;padding:10px}
+  .sp-btn{padding:8px 12px;font-size:.76rem}
+  .sched-slot{padding:10px}
+  .sched-teams{font-size:.82rem}
+
   /* header */
   header{padding:10px 10px}
   header h1{font-size:1rem;margin-bottom:8px}
@@ -193,6 +199,25 @@ tr.rele td:first-child{border-left:3px solid #a54}
 .local-strip .info{font-size:.78rem;color:#aa8}
 .local-strip .detail{font-size:.73rem;color:#887}
 
+/* scheduler */
+.sched-players{display:flex;flex-wrap:wrap;gap:6px;padding:12px 14px}
+.sp-btn{padding:6px 14px;background:#1e1e1e;border:1px solid #2a2a2a;color:#888;border-radius:5px;cursor:pointer;font-size:.78rem;transition:all .12s}
+.sp-btn:hover{border-color:#444;color:#bbb}
+.sp-btn.on{background:#1a2e1a;border-color:#3a5a3a;color:#7b7;font-weight:600}
+.sched-actions{padding:0 14px 12px;display:flex;gap:8px;align-items:center}
+.sched-result{padding:0 14px 14px}
+.sched-slot{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #1e1e1e}
+.sched-slot:last-child{border-bottom:none}
+.sched-num{width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.78rem;color:#aaa;background:#1a1a1a;border-radius:50%;flex-shrink:0}
+.sched-match{flex:1}
+.sched-teams{font-size:.85rem;font-weight:600;color:#ddd}
+.sched-teams .v{color:#555;font-weight:400;font-size:.72rem;margin:0 6px}
+.sched-sit{font-size:.68rem;color:#666;margin-top:2px}
+.sched-sit span{color:#999}
+.sched-warn{font-size:.68rem;color:#a54;margin-top:1px}
+.sched-leave{font-size:.68rem;color:#5b5;margin-top:2px}
+.sched-note{font-size:.72rem;color:#666;padding:10px 14px;border-top:1px solid #1e1e1e}
+
 .hidden{display:none!important}
 </style>
 </head>
@@ -208,6 +233,7 @@ tr.rele td:first-child{border-left:3px solid #a54}
 <script>
 let leagues={},currentLeague=null,matchFilters={},selectedPlayer=null,allScenarios={},allAnalysis={};
 let localResults=JSON.parse(localStorage.getItem('gdsi_local')||'{}');
+let presentPlayers=new Set();
 function saveLocal(){localStorage.setItem('gdsi_local',JSON.stringify(localResults))}
 
 function parseWorkbook(wb){
@@ -253,6 +279,103 @@ function getEff(ln){
     }else nr.push(m);
   });
   return{players:pl,matches:nm,remaining:nr};
+}
+
+function togglePresent(name){
+  if(presentPlayers.has(name))presentPlayers.delete(name);else presentPlayers.add(name);
+  render();
+}
+function selectAllPresent(){
+  const lg=getEff(currentLeague);if(!lg)return;
+  if(presentPlayers.size===lg.players.length)presentPlayers.clear();
+  else lg.players.forEach(p=>presentPlayers.add(p.name));
+  render();
+}
+function generateSchedule(lg){
+  if(presentPlayers.size<2)return null;
+  const eligible=lg.remaining.filter(m=>[...m.team1,...m.team2].every(n=>presentPlayers.has(n)));
+  if(!eligible.length)return{matches:[],warnings:[]};
+  const present=[...presentPlayers];
+
+  // evaluate an ordering: returns [maxConsecutiveSit, countOfDoubleSitSlots]
+  function evalOrder(order){
+    const streak={};present.forEach(p=>streak[p]=0);
+    let maxS=0,doubles=0;
+    order.forEach(m=>{
+      const playing=new Set([...m.team1,...m.team2]);
+      let slotHasDouble=false;
+      present.forEach(p=>{
+        if(playing.has(p)){streak[p]=0}
+        else{streak[p]++;if(streak[p]>maxS)maxS=streak[p];if(streak[p]>=2)slotHasDouble=true}
+      });
+      if(slotHasDouble)doubles++;
+    });
+    return[maxS,doubles];
+  }
+
+  let bestOrder=null,bestScore=null;
+  function isBetter(s){return!bestScore||s[0]<bestScore[0]||(s[0]===bestScore[0]&&s[1]<bestScore[1])}
+
+  if(eligible.length<=8){
+    // brute-force all permutations for true optimal
+    function permute(arr,l){
+      if(l===arr.length){const s=evalOrder(arr);if(isBetter(s)){bestScore=s;bestOrder=[...arr]}return}
+      for(let i=l;i<arr.length;i++){
+        [arr[l],arr[i]]=[arr[i],arr[l]];
+        permute(arr,l+1);
+        [arr[l],arr[i]]=[arr[i],arr[l]];
+      }
+    }
+    permute(eligible,0);
+  }else{
+    // min-max greedy: pick match that minimizes worst consecutive sit
+    bestOrder=[];
+    const rem=[...eligible];
+    const streak={};present.forEach(p=>streak[p]=0);
+    while(rem.length){
+      let bestIdx=0,bestMax=Infinity,bestSum=Infinity;
+      rem.forEach((m,idx)=>{
+        const playing=new Set([...m.team1,...m.team2]);
+        let worstS=0,sumS=0;
+        present.forEach(p=>{
+          const ns=playing.has(p)?0:streak[p]+1;
+          if(ns>worstS)worstS=ns;
+          if(ns>=2)sumS+=ns;
+        });
+        if(worstS<bestMax||(worstS===bestMax&&sumS<bestSum)){bestIdx=idx;bestMax=worstS;bestSum=sumS}
+      });
+      const chosen=rem.splice(bestIdx,1)[0];
+      bestOrder.push(chosen);
+      const playing=new Set([...chosen.team1,...chosen.team2]);
+      present.forEach(p=>{streak[p]=playing.has(p)?0:streak[p]+1});
+    }
+  }
+
+  // find each player's last match index
+  const lastMatch={};
+  bestOrder.forEach((m,i)=>{
+    [...m.team1,...m.team2].forEach(p=>{lastMatch[p]=i});
+  });
+
+  // build result with sit info, warnings, and "can leave" markers
+  const warnings=[];
+  const streak={};present.forEach(p=>streak[p]=0);
+  const result=bestOrder.map((m,i)=>{
+    const playing=new Set([...m.team1,...m.team2]);
+    const sitting=present.filter(p=>!playing.has(p)&&lastMatch[p]>=i);
+    const entry={match:m,sitting,index:i};
+    const doubleSit=sitting.filter(p=>streak[p]>=1);
+    if(doubleSit.length){
+      entry.doubleSit=doubleSit;
+      warnings.push(`${doubleSit.map(sn).join(', ')} sjedi ${streak[doubleSit[0]]+1} susreta zaredom (do ${i+1}.)`);
+    }
+    // players whose last match is this one — they can leave after
+    const canLeave=present.filter(p=>lastMatch[p]===i);
+    if(canLeave.length)entry.canLeave=canLeave;
+    present.forEach(p=>{streak[p]=playing.has(p)?0:streak[p]+1});
+    return entry;
+  });
+  return{matches:result,warnings};
 }
 
 function applyFilters(lg){
@@ -334,7 +457,7 @@ function render(){
     const b=document.createElement('button');b.className='tab'+(name===currentLeague?' active':'');
     const e=getEff(name),r=e?e.remaining.length:0;
     b.innerHTML=name+(r?`<span class="rem">${r}</span>`:'');
-    b.onclick=()=>{currentLeague=name;matchFilters={};recalc()};tabs.appendChild(b);
+    b.onclick=()=>{currentLeague=name;matchFilters={};presentPlayers.clear();recalc()};tabs.appendChild(b);
   });
 
   const main=document.getElementById('main');main.innerHTML='';
@@ -392,6 +515,41 @@ function render(){
   th+='</table>';
   cards+='</div>';
   main.innerHTML+=`<div class="section"><div class="section-head">Poredak${an?(an.approx?' (~aproksimacija)':''):' (konacno)'}</div><div class="section-body">${th}${cards}</div></div>`;
+
+  // scheduler
+  if(lgBase.remaining.length){
+    let sc='<div class="section"><div class="section-head">Raspored igranja <span class="note">odaberi tko je dosao</span></div>';
+    sc+=`<div class="sched-players">`;
+    sc+=`<button class="sp-btn${presentPlayers.size===lgBase.players.length?' on':''}" onclick="selectAllPresent()" style="border-style:dashed">Svi</button>`;
+    lgBase.players.forEach(p=>{
+      sc+=`<button class="sp-btn${presentPlayers.has(p.name)?' on':''}" onclick="togglePresent('${p.name}')">${p.name}</button>`;
+    });
+    sc+=`</div>`;
+    if(presentPlayers.size>=2){
+      const sched=generateSchedule(lgBase);
+      if(sched&&sched.matches.length){
+        sc+=`<div class="sched-result">`;
+        sched.matches.forEach((s,i)=>{
+          const t1=s.match.team1.map(sn).join(' / '),t2=s.match.team2.map(sn).join(' / ');
+          sc+=`<div class="sched-slot"><div class="sched-num">${i+1}</div><div class="sched-match"><div class="sched-teams">${t1}<span class="v">vs</span>${t2}</div>`;
+          if(s.sitting.length)sc+=`<div class="sched-sit">Ceka: <span>${s.sitting.map(sn).join(', ')}</span></div>`;
+          if(s.doubleSit&&s.doubleSit.length)sc+=`<div class="sched-warn">${s.doubleSit.map(sn).join(', ')} ceka 2. put zaredom</div>`;
+          if(s.canLeave&&s.canLeave.length)sc+=`<div class="sched-leave">${s.canLeave.map(sn).join(', ')} moze ici nakon ovog susreta</div>`;
+          sc+=`</div></div>`;
+        });
+        sc+=`</div>`;
+        if(sched.warnings.length)sc+=`<div class="sched-note">⚠ ${sched.warnings.join(' / ')}</div>`;
+        // count eligible vs total remaining
+        const totalRemaining=lgBase.remaining.length;
+        const eligible=lgBase.remaining.filter(m=>[...m.team1,...m.team2].every(n=>presentPlayers.has(n))).length;
+        if(eligible<totalRemaining)sc+=`<div class="sched-note">${eligible} od ${totalRemaining} preostalih susreta moguce odigrati s odabranim igracima</div>`;
+      }else if(sched){
+        sc+=`<div class="sched-note">Nema preostalih susreta za odabrane igrace</div>`;
+      }
+    }
+    sc+=`</div>`;
+    main.innerHTML+=sc;
+  }
 
   if(an){
     // stats
