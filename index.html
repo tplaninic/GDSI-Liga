@@ -495,27 +495,37 @@ function render(){
   }
 
   // standings
+  const isTop=currentLeague==='1. Liga';
   const n=lg.players.length,rs=n<=5?4:5;
+  function zoneStats(name){
+    if(!an)return{promo:0,stay:100,rele:0};
+    let promo=0,stay=0,rele=0;
+    for(let i=1;i<=n;i++){
+      const c=an.pc[name][i]||0;
+      if(!isTop&&i<=2)promo+=c;else if(i>=rs)rele+=c;else stay+=c;
+    }
+    return{promo:Math.round(promo/an.tot*100),stay:Math.round(stay/an.tot*100),rele:Math.round(rele/an.tot*100)};
+  }
   const sorted=[...lg.players].sort((a,b)=>{if(b.score!==a.score)return b.score-a.score;if(a.matches!==b.matches)return a.matches-b.matches;const[aw,al]=pr(a.games),[bw,bl]=pr(b.games);return(bw-bl)-(aw-al)});
   // desktop table
   let th=`<table class="standings-table"><tr><th>#</th><th>Igrac</th><th>Bod</th><th class="hide-mobile">Odig</th><th class="hide-mobile">W:L</th><th class="hide-mobile">Gem</th><th class="hide-mobile">Poen</th>`;
-  if(an)th+=`<th class="hide-mobile">Pozicije</th><th class="hide-mobile">Prom%</th><th class="hide-mobile">Isp%</th><th></th>`;
+  if(an){th+=`<th class="hide-mobile">Pozicije</th>`;if(!isTop)th+=`<th class="hide-mobile">Prom%</th>`;th+=`<th class="hide-mobile">Isp%</th><th></th>`;}
   th+='</tr>';
   // mobile cards
   let cards='<div class="standings-cards">';
   sorted.forEach((p,i)=>{
-    const rk=i+1,me=p.name===selectedPlayer,zone=rk<=2?'promo':rk>=rs?'rele':'';
+    const rk=i+1,me=p.name===selectedPlayer,zone=(!isTop&&rk<=2)?'promo':rk>=rs?'rele':'';
     th+=`<tr class="${zone}${me?' me':''}"><td style="font-weight:700">${rk}</td><td><span class="player-name-full">${p.name}</span><span class="player-name-short">${sn(p.name)}</span>${me?' <span class="tag tag-blue">TI</span>':''}</td><td><b>${p.score}</b></td><td class="hide-mobile">${p.matches}</td><td class="hide-mobile">${p.wl}</td><td class="hide-mobile">${p.games}</td><td class="hide-mobile">${p.points}</td>`;
     let st='';
-    if(an){const g=an.gu[p.name];
+    if(an){const g=an.gu[p.name],z=zoneStats(p.name);
       th+=`<td class="hide-mobile" style="color:#888">${g.bp}. - ${g.wp}.</td>`;
-      th+=`<td class="hide-mobile" style="color:${g.pc>=100?'#5b5':g.pc>0?'#ba5':'#555'}">${g.pc.toFixed(0)}%</td>`;
-      th+=`<td class="hide-mobile" style="color:${g.rc>=100?'#b55':g.rc>0?'#ba5':'#555'}">${g.rc.toFixed(0)}%</td>`;
-      if(g.gp)st='<span class="tag tag-green">NAPREDUJE</span>';
-      else if(g.gr)st='<span class="tag tag-red">ISPADA</span>';
-      else if(g.pc>0&&g.rc>0)st='<span class="tag tag-yellow">NEIZVJESNO</span>';
-      else if(g.pc>0)st='<span class="tag tag-green">MOZE NAPREDOVATI</span>';
-      else if(g.rc>0)st='<span class="tag tag-red">MOZE ISPASTI</span>';
+      if(!isTop)th+=`<td class="hide-mobile" style="color:${z.promo>=100?'#5b5':z.promo>0?'#ba5':'#555'}">${z.promo.toFixed(0)}%</td>`;
+      th+=`<td class="hide-mobile" style="color:${z.rele>=100?'#b55':z.rele>0?'#ba5':'#555'}">${z.rele.toFixed(0)}%</td>`;
+      if(z.promo>=100)st='<span class="tag tag-green">NAPREDUJE</span>';
+      else if(z.rele>=100)st='<span class="tag tag-red">ISPADA</span>';
+      else if(z.promo>0&&z.rele>0)st='<span class="tag tag-yellow">NEIZVJESNO</span>';
+      else if(z.promo>0)st='<span class="tag tag-green">MOZE NAPREDOVATI</span>';
+      else if(z.rele>0)st='<span class="tag tag-red">MOZE ISPASTI</span>';
       else st='<span class="tag tag-blue">OSTAJE</span>';
       th+=`<td>${st}</td>`;
     }
@@ -572,27 +582,19 @@ function render(){
     sh+=`<div class="stat"><div class="val">${an.tot.toLocaleString()}</div><div class="lbl">Scenarija${an.approx?' (uzorak)':''}</div></div>`;
     sh+=`<div class="stat"><div class="val">${an.combos.length}</div><div class="lbl">Razlicitih poredaka</div></div>`;
     sh+=`<div class="stat"><div class="val">${lgBase.remaining.length}</div><div class="lbl">Preostalih susreta</div></div>`;
-    if(selectedPlayer&&an.gu[selectedPlayer]){const g=an.gu[selectedPlayer];
-      sh+=`<div class="stat"><div class="val" style="color:#5b5">${g.pc.toFixed(0)}%</div><div class="lbl">Sansa za promociju</div></div>`;
-      sh+=`<div class="stat"><div class="val" style="color:${g.rc>0?'#b55':'#5b5'}">${g.rc.toFixed(0)}%</div><div class="lbl">Rizik ispadanja</div></div>`;
+    if(selectedPlayer&&an.gu[selectedPlayer]){const sz=zoneStats(selectedPlayer);
+      if(!isTop)sh+=`<div class="stat"><div class="val" style="color:#5b5">${sz.promo.toFixed(0)}%</div><div class="lbl">Sansa za promociju</div></div>`;
+      sh+=`<div class="stat"><div class="val" style="color:${sz.rele>0?'#b55':'#5b5'}">${sz.rele.toFixed(0)}%</div><div class="lbl">Rizik ispadanja</div></div>`;
     }
     sh+='</div>';
     // guaranteed
     const guar=[];
-    lg.players.forEach(p=>{const g=an.gu[p.name];if(g.gp)guar.push(`<span style="color:#5b5">${sn(p.name)} napreduje</span>`);if(g.gr)guar.push(`<span style="color:#b55">${sn(p.name)} ispada</span>`)});
+    lg.players.forEach(p=>{const gz=zoneStats(p.name);if(gz.promo>=100)guar.push(`<span style="color:#5b5">${sn(p.name)} napreduje</span>`);if(gz.rele>=100)guar.push(`<span style="color:#b55">${sn(p.name)} ispada</span>`);if(gz.stay>=100)guar.push(`<span style="color:#7ab">${sn(p.name)} ostaje</span>`)});
     if(guar.length)sh+=`<div style="padding:0 16px 14px;font-size:.8rem;color:#888">Sigurno: ${guar.join(' / ')}</div>`;
     main.innerHTML+=`<div class="section">${sh}</div>`;
 
-    // probabilities - 3 zones: promote (top 2), stay (middle), relegate (rs+)
+    // probabilities
     const scenData=allScenarios[currentLeague];
-    function zoneStats(name){
-      let promo=0,stay=0,rele=0;
-      for(let i=1;i<=n;i++){
-        const c=an.pc[name][i]||0;
-        if(i<=2)promo+=c;else if(i>=rs)rele+=c;else stay+=c;
-      }
-      return{promo:promo/an.tot*100,stay:stay/an.tot*100,rele:rele/an.tot*100};
-    }
     // compute what needs to happen for a player to land in a zone
     function zoneConditions(name,zone){
       if(!scenData||!scenData.scenarios.length)return'';
@@ -640,16 +642,17 @@ function render(){
     }
     // desktop table
     let pb=`<div class="prob-table-desktop"><table><tr><th>Igrac</th>`;
-    pb+=`<th style="text-align:center">Napreduje</th><th style="text-align:center">Ostaje</th><th style="text-align:center">Ispada</th>`;
+    if(!isTop)pb+=`<th style="text-align:center">Napreduje</th>`;
+    pb+=`<th style="text-align:center">Ostaje</th><th style="text-align:center">Ispada</th>`;
     pb+='<th style="min-width:180px"></th></tr>';
     sorted.forEach(p=>{const me=p.name===selectedPlayer;const z=zoneStats(p.name);
       const tp=tipAttr(p.name,'promo','Napreduje',z.promo),ts=tipAttr(p.name,'stay','Ostaje',z.stay),tr=tipAttr(p.name,'rele','Ispada',z.rele);
       pb+=`<tr${me?' class="me"':''}><td>${sn(p.name)}</td>`;
-      pb+=`<td style="text-align:center;color:${z.promo>0?'#5b5':'#444'};font-weight:${z.promo>0?'600':'400'}">${z.promo.toFixed(0)}%</td>`;
+      if(!isTop)pb+=`<td style="text-align:center;color:${z.promo>0?'#5b5':'#444'};font-weight:${z.promo>0?'600':'400'}">${z.promo.toFixed(0)}%</td>`;
       pb+=`<td style="text-align:center;color:${z.stay>0?'#ba5':'#444'};font-weight:${z.stay>0?'600':'400'}">${z.stay.toFixed(0)}%</td>`;
       pb+=`<td style="text-align:center;color:${z.rele>0?'#b55':'#444'};font-weight:${z.rele>0?'600':'400'}">${z.rele.toFixed(0)}%</td>`;
       pb+=`<td><div class="pbar">`;
-      if(z.promo>0)pb+=`<span class="zt-wrap"${tp} style="width:${z.promo}%;background:#3a6a3a">${z.promo>=8?z.promo.toFixed(0)+'%':''}</span>`;
+      if(!isTop&&z.promo>0)pb+=`<span class="zt-wrap"${tp} style="width:${z.promo}%;background:#3a6a3a">${z.promo>=8?z.promo.toFixed(0)+'%':''}</span>`;
       if(z.stay>0)pb+=`<span class="zt-wrap"${ts} style="width:${z.stay}%;background:#6a5a2a">${z.stay>=8?z.stay.toFixed(0)+'%':''}</span>`;
       if(z.rele>0)pb+=`<span class="zt-wrap"${tr} style="width:${z.rele}%;background:#6a2a2a">${z.rele>=8?z.rele.toFixed(0)+'%':''}</span>`;
       pb+=`</div></td></tr>`;
@@ -660,11 +663,11 @@ function render(){
     sorted.forEach(p=>{const me=p.name===selectedPlayer;const z=zoneStats(p.name);
       const tp=tipAttr(p.name,'promo','Napreduje',z.promo),ts=tipAttr(p.name,'stay','Ostaje',z.stay),tr=tipAttr(p.name,'rele','Ispada',z.rele);
       pmc+=`<div class="prob-card${me?' me':''}"><div class="prob-card-name">${p.name}</div><div class="prob-card-bar">`;
-      if(z.promo>0)pmc+=`<span class="zt-wrap"${tp} style="width:${z.promo}%;background:#3a6a3a">${z.promo>=6?z.promo.toFixed(0)+'%':''}</span>`;
+      if(!isTop&&z.promo>0)pmc+=`<span class="zt-wrap"${tp} style="width:${z.promo}%;background:#3a6a3a">${z.promo>=6?z.promo.toFixed(0)+'%':''}</span>`;
       if(z.stay>0)pmc+=`<span class="zt-wrap"${ts} style="width:${z.stay}%;background:#6a5a2a">${z.stay>=6?z.stay.toFixed(0)+'%':''}</span>`;
       if(z.rele>0)pmc+=`<span class="zt-wrap"${tr} style="width:${z.rele}%;background:#6a2a2a">${z.rele>=6?z.rele.toFixed(0)+'%':''}</span>`;
       pmc+=`</div><div class="prob-card-positions">`;
-      if(z.promo>0)pmc+=`<span class="prob-pos zt-wrap"${tp} style="color:#5b5"><b>${z.promo.toFixed(0)}%</b> napreduje</span>`;
+      if(!isTop&&z.promo>0)pmc+=`<span class="prob-pos zt-wrap"${tp} style="color:#5b5"><b>${z.promo.toFixed(0)}%</b> napreduje</span>`;
       if(z.stay>0)pmc+=`<span class="prob-pos zt-wrap"${ts} style="color:#ba5"><b>${z.stay.toFixed(0)}%</b> ostaje</span>`;
       if(z.rele>0)pmc+=`<span class="prob-pos zt-wrap"${tr} style="color:#b55"><b>${z.rele.toFixed(0)}%</b> ispada</span>`;
       pmc+=`</div></div>`;
