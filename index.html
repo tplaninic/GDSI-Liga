@@ -154,7 +154,10 @@ tr.rele td:first-child{border-left:3px solid #a54}
 .player-name-short{display:none}
 
 /* prob bars */
-.pbar{height:18px;display:flex;border-radius:3px;overflow:hidden;background:#1a1a1a}
+.pbar{height:18px;display:flex;border-radius:3px;background:#1a1a1a;position:relative}
+.pbar>.zt-wrap:first-child{border-radius:3px 0 0 3px}
+.pbar>.zt-wrap:last-child{border-radius:0 3px 3px 0}
+.pbar>.zt-wrap:only-child{border-radius:3px}
 .pbar span{display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:600;color:#000}
 
 /* remaining matches */
@@ -218,6 +221,17 @@ tr.rele td:first-child{border-left:3px solid #a54}
 .sched-leave{font-size:.68rem;color:#5b5;margin-top:2px}
 .sched-note{font-size:.72rem;color:#666;padding:10px 14px;border-top:1px solid #1e1e1e}
 
+/* zone tooltip - fixed overlay */
+.zt-wrap{cursor:pointer}
+#zt-overlay{display:none;position:fixed;z-index:1000;background:#1e1e1e;border:1px solid #444;border-radius:8px;padding:12px 14px;font-size:.75rem;color:#ccc;box-shadow:0 8px 32px rgba(0,0,0,.7);min-width:260px;max-width:400px;pointer-events:none}
+#zt-overlay.visible{display:block}
+#zt-overlay .zt-head{font-weight:600;margin-bottom:8px;font-size:.8rem;color:#eee}
+#zt-overlay .zt-row{display:flex;justify-content:space-between;gap:14px;padding:4px 0;border-bottom:1px solid #2a2a2a}
+#zt-overlay .zt-row:last-child{border-bottom:none}
+#zt-overlay .zt-match{color:#999}
+#zt-overlay .zt-outcome{font-weight:600;color:#ddd}
+#zt-overlay .zt-none{color:#666;font-style:italic}
+
 .hidden{display:none!important}
 </style>
 </head>
@@ -229,6 +243,7 @@ tr.rele td:first-child{border-left:3px solid #a54}
 </header>
 <div id="status">Ucitavanje...</div>
 <div class="wrap hidden" id="main"></div>
+<div id="zt-overlay"></div>
 
 <script>
 let leagues={},currentLeague=null,matchFilters={},selectedPlayer=null,allScenarios={},allAnalysis={};
@@ -569,6 +584,7 @@ function render(){
     main.innerHTML+=`<div class="section">${sh}</div>`;
 
     // probabilities - 3 zones: promote (top 2), stay (middle), relegate (rs+)
+    const scenData=allScenarios[currentLeague];
     function zoneStats(name){
       let promo=0,stay=0,rele=0;
       for(let i=1;i<=n;i++){
@@ -577,33 +593,80 @@ function render(){
       }
       return{promo:promo/an.tot*100,stay:stay/an.tot*100,rele:rele/an.tot*100};
     }
+    // compute what needs to happen for a player to land in a zone
+    function zoneConditions(name,zone){
+      if(!scenData||!scenData.scenarios.length)return'';
+      const sc=scenData.scenarios;
+      const inZone=sc.filter(s=>{
+        const pos=s.rk.indexOf(name)+1;
+        if(zone==='promo')return pos<=2;
+        if(zone==='rele')return pos>=rs;
+        return pos>2&&pos<rs;
+      });
+      if(!inZone.length)return'';
+      const lgEff=getEff(currentLeague);
+      if(!lgEff||!lgEff.remaining.length)return'';
+      const nm=lgEff.remaining.length;
+      let html='';
+      for(let mi=0;mi<nm;mi++){
+        const mt=lgEff.remaining[mi];
+        const cnt={'2-0':0,'2-1':0,'1-2':0,'0-2':0};
+        inZone.forEach(s=>{const o=s.mo[mi];if(o)cnt[o.l]++});
+        const t1s=mt.team1.map(sn).join('/'),t2s=mt.team2.map(sn).join('/');
+        // find most common outcome
+        const sorted=Object.entries(cnt).sort((a,b)=>b[1]-a[1]);
+        const best=sorted[0];
+        if(!best[1])continue;
+        // translate to "who wins how"
+        let winner,score;
+        if(best[0]==='2-0'){winner=t1s;score='2:0'}
+        else if(best[0]==='2-1'){winner=t1s;score='2:1'}
+        else if(best[0]==='1-2'){winner=t2s;score='2:1'}
+        else{winner=t2s;score='2:0'}
+        html+=`<div class="zt-row"><span class="zt-match">${t1s} vs ${t2s}</span><span class="zt-outcome">${winner} dobiva ${score}</span></div>`;
+      }
+      return html;
+    }
+    function tipContent(name,zone,label,pct){
+      if(pct>=100)return`<div class="zt-head">${label}</div><div style="color:#888;font-size:.72rem">Sigurno, bez obzira na rezultate</div>`;
+      const c=zoneConditions(name,zone);
+      if(!c)return'';
+      return`<div class="zt-head">${label} — koji rezultati?</div>${c}`;
+    }
+    function tipAttr(name,zone,label,pct){
+      const c=tipContent(name,zone,label,pct);
+      if(!c)return'';
+      return` data-tip="${c.replace(/"/g,'&quot;')}"`;
+    }
     // desktop table
     let pb=`<div class="prob-table-desktop"><table><tr><th>Igrac</th>`;
     pb+=`<th style="text-align:center">Napreduje</th><th style="text-align:center">Ostaje</th><th style="text-align:center">Ispada</th>`;
     pb+='<th style="min-width:180px"></th></tr>';
     sorted.forEach(p=>{const me=p.name===selectedPlayer;const z=zoneStats(p.name);
+      const tp=tipAttr(p.name,'promo','Napreduje',z.promo),ts=tipAttr(p.name,'stay','Ostaje',z.stay),tr=tipAttr(p.name,'rele','Ispada',z.rele);
       pb+=`<tr${me?' class="me"':''}><td>${sn(p.name)}</td>`;
       pb+=`<td style="text-align:center;color:${z.promo>0?'#5b5':'#444'};font-weight:${z.promo>0?'600':'400'}">${z.promo.toFixed(0)}%</td>`;
       pb+=`<td style="text-align:center;color:${z.stay>0?'#ba5':'#444'};font-weight:${z.stay>0?'600':'400'}">${z.stay.toFixed(0)}%</td>`;
       pb+=`<td style="text-align:center;color:${z.rele>0?'#b55':'#444'};font-weight:${z.rele>0?'600':'400'}">${z.rele.toFixed(0)}%</td>`;
       pb+=`<td><div class="pbar">`;
-      if(z.promo>0)pb+=`<span style="width:${z.promo}%;background:#3a6a3a">${z.promo>=8?z.promo.toFixed(0)+'%':''}</span>`;
-      if(z.stay>0)pb+=`<span style="width:${z.stay}%;background:#6a5a2a">${z.stay>=8?z.stay.toFixed(0)+'%':''}</span>`;
-      if(z.rele>0)pb+=`<span style="width:${z.rele}%;background:#6a2a2a">${z.rele>=8?z.rele.toFixed(0)+'%':''}</span>`;
+      if(z.promo>0)pb+=`<span class="zt-wrap"${tp} style="width:${z.promo}%;background:#3a6a3a">${z.promo>=8?z.promo.toFixed(0)+'%':''}</span>`;
+      if(z.stay>0)pb+=`<span class="zt-wrap"${ts} style="width:${z.stay}%;background:#6a5a2a">${z.stay>=8?z.stay.toFixed(0)+'%':''}</span>`;
+      if(z.rele>0)pb+=`<span class="zt-wrap"${tr} style="width:${z.rele}%;background:#6a2a2a">${z.rele>=8?z.rele.toFixed(0)+'%':''}</span>`;
       pb+=`</div></td></tr>`;
     });
     pb+='</table></div>';
     // mobile cards
     let pmc='<div class="prob-cards" style="display:none">';
     sorted.forEach(p=>{const me=p.name===selectedPlayer;const z=zoneStats(p.name);
+      const tp=tipAttr(p.name,'promo','Napreduje',z.promo),ts=tipAttr(p.name,'stay','Ostaje',z.stay),tr=tipAttr(p.name,'rele','Ispada',z.rele);
       pmc+=`<div class="prob-card${me?' me':''}"><div class="prob-card-name">${p.name}</div><div class="prob-card-bar">`;
-      if(z.promo>0)pmc+=`<span style="width:${z.promo}%;background:#3a6a3a">${z.promo>=6?z.promo.toFixed(0)+'%':''}</span>`;
-      if(z.stay>0)pmc+=`<span style="width:${z.stay}%;background:#6a5a2a">${z.stay>=6?z.stay.toFixed(0)+'%':''}</span>`;
-      if(z.rele>0)pmc+=`<span style="width:${z.rele}%;background:#6a2a2a">${z.rele>=6?z.rele.toFixed(0)+'%':''}</span>`;
+      if(z.promo>0)pmc+=`<span class="zt-wrap"${tp} style="width:${z.promo}%;background:#3a6a3a">${z.promo>=6?z.promo.toFixed(0)+'%':''}</span>`;
+      if(z.stay>0)pmc+=`<span class="zt-wrap"${ts} style="width:${z.stay}%;background:#6a5a2a">${z.stay>=6?z.stay.toFixed(0)+'%':''}</span>`;
+      if(z.rele>0)pmc+=`<span class="zt-wrap"${tr} style="width:${z.rele}%;background:#6a2a2a">${z.rele>=6?z.rele.toFixed(0)+'%':''}</span>`;
       pmc+=`</div><div class="prob-card-positions">`;
-      if(z.promo>0)pmc+=`<span class="prob-pos" style="color:#5b5"><b>${z.promo.toFixed(0)}%</b> napreduje</span>`;
-      if(z.stay>0)pmc+=`<span class="prob-pos" style="color:#ba5"><b>${z.stay.toFixed(0)}%</b> ostaje</span>`;
-      if(z.rele>0)pmc+=`<span class="prob-pos" style="color:#b55"><b>${z.rele.toFixed(0)}%</b> ispada</span>`;
+      if(z.promo>0)pmc+=`<span class="prob-pos zt-wrap"${tp} style="color:#5b5"><b>${z.promo.toFixed(0)}%</b> napreduje</span>`;
+      if(z.stay>0)pmc+=`<span class="prob-pos zt-wrap"${ts} style="color:#ba5"><b>${z.stay.toFixed(0)}%</b> ostaje</span>`;
+      if(z.rele>0)pmc+=`<span class="prob-pos zt-wrap"${tr} style="color:#b55"><b>${z.rele.toFixed(0)}%</b> ispada</span>`;
       pmc+=`</div></div>`;
     });
     pmc+='</div>';
@@ -671,6 +734,46 @@ function saveScore(ln,mid){
   let g1=0,g2=0;sc.forEach(([a,b])=>{a>b?g1++:b>a?g2++:0});
   if(g1<2&&g2<2){alert('Rezultat mora biti 2:0, 2:1, 1:2 ili 0:2');return}
   if(!localResults[ln])localResults[ln]={};localResults[ln][mid]={scores:sc};saveLocal();recalc();
+}
+
+// tooltip overlay logic
+const ztEl=document.getElementById('zt-overlay');
+let ztLocked=false;
+document.addEventListener('mouseover',e=>{
+  if(ztLocked)return;
+  const w=e.target.closest('.zt-wrap');
+  if(w&&w.dataset.tip){
+    ztEl.innerHTML=w.dataset.tip;
+    ztEl.classList.add('visible');
+    positionTip(w);
+  }else{ztEl.classList.remove('visible')}
+});
+document.addEventListener('mouseout',e=>{
+  if(ztLocked)return;
+  const w=e.target.closest('.zt-wrap');
+  if(w)ztEl.classList.remove('visible');
+});
+document.addEventListener('click',e=>{
+  const w=e.target.closest('.zt-wrap');
+  if(w&&w.dataset.tip){
+    if(ztLocked&&ztEl.classList.contains('visible')){ztLocked=false;ztEl.classList.remove('visible');return}
+    ztEl.innerHTML=w.dataset.tip;
+    ztEl.classList.add('visible');
+    ztLocked=true;
+    positionTip(w);
+  }else{ztLocked=false;ztEl.classList.remove('visible')}
+});
+function positionTip(el){
+  const r=el.getBoundingClientRect();
+  const tw=ztEl.offsetWidth,th=ztEl.offsetHeight;
+  let left=r.left+r.width/2-tw/2;
+  let top=r.top-th-10;
+  // keep on screen
+  if(left<8)left=8;
+  if(left+tw>window.innerWidth-8)left=window.innerWidth-tw-8;
+  if(top<8){top=r.bottom+10}// flip below if no room above
+  ztEl.style.left=left+'px';
+  ztEl.style.top=top+'px';
 }
 
 const WORKER_URL='https://empty-breeze-43cb.tomislav-planini.workers.dev';
